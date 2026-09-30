@@ -1,164 +1,103 @@
-# 🌍 360° Immersive Experience Platform
+# 360° Immersive Room with ESP32 Scent Diffusers
 
-A multisensory immersive experience system that generates 360° panoramic environments with synchronized ambient sounds and scent diffusion, controlled via voice commands.
+A voice-driven multisensory room. A visitor describes a place out loud, and within about a minute the room shows it as an 8K 360° panorama on four projectors, plays matching ambient sound and releases a matching scent.
 
-## ✨ Features
+Built as a Howest CTAI team project (team Ergo G1, 2025–2026) for the occupational-therapy track.
 
-- **Voice-to-Panorama Generation** - Describe a scene and get an AI-generated 360° panoramic image
-- **Ambient Sound Integration** - Automatically matched environmental audio (beach waves, forest birds, etc.)
-- **Scent Diffusion Control** - ESP32-powered diffusers release matching aromas for full immersion
-- **Pre-made Scene Library** - Curated scenes: Beach, Forest, Garden, Mountain
-- **Real-time Generation** - On-demand panorama creation via Azure AI services
+## How it works
 
-## 🏗️ Architecture
+1. **Voice to prompt.** A recording is sent to an Azure Function. Azure Speech transcribes it and GPT-4o-mini turns it into an image prompt and a scene category (beach, forest, garden or mountain).
+2. **Prompt to panorama.** ComfyUI on a campus GPU server generates a seamless 360° image with SDXL (JuggernautXL v9 + a 360° LoRA) and upscales it 4× with ESRGAN to 8192 × 4096. The result goes to Azure Blob Storage.
+3. **Sound.** A matching ambient track for the category is picked from Blob Storage.
+4. **Scent.** The backend calls a small Python Azure Function, which sends a cloud-to-device message through Azure IoT Hub to the ESP32 diffuser for that scene.
+5. **Display.** The Unity front end (not in this repo) shows the panorama and plays the sound.
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Voice Input   │────▶│  Azure Functions │────▶│ 360° Panorama   │
-│   (Recording)   │     │  (Speech + GPT)  │     │   + Sound URL   │
-└─────────────────┘     └────────┬─────────┘     └─────────────────┘
-                                 │
-                                 ▼
-                        ┌──────────────────┐
-                        │  Azure IoT Hub   │
-                        └────────┬─────────┘
-                                 │
-        ┌────────────────────────┼────────────────────────┐
-        ▼                        ▼                        ▼
-┌───────────────┐       ┌───────────────┐       ┌───────────────┐
-│  ESP32 Beach  │       │ ESP32 Forest  │       │ ESP32 Garden  │ ...
-│   Diffuser    │       │   Diffuser    │       │   Diffuser    │
-└───────────────┘       └───────────────┘       └───────────────┘
+Voice ──▶ .NET Azure Functions ──▶ ComfyUI (SDXL) ──▶ 8K panorama + sound
+                 │
+                 ▼
+        espendpoint (Python) ──▶ Azure IoT Hub ──MQTT/TLS──▶ 4 × ESP32 diffusers
 ```
 
-## 📁 Project Structure
+## Scent diffusers
+
+Four identical units, one per scene: `esp0-beach`, `esp1-forest`, `esp2-garden`, `esp3-mountain`.
+
+- **Firmware:** C on ESP-IDF 5 with FreeRTOS (`Code/esp32/esp-diffuser/main`).
+  - Joins Wi-Fi, with a fallback network.
+  - Syncs time over SNTP and signs its own IoT Hub SAS token (HMAC-SHA256).
+  - Connects over MQTT with TLS on port 8883.
+- **Commands:** JSON messages such as `{"command": "on", "duration": 2}` switch the fans on for the given number of minutes; `"off"` stops them.
+- **Hardware:** ESP32, relay module switching two fans (GPIO 27 and 26), powered from a power bank.
+- **Enclosure:** 3D-printed housing and scent-bottle bracket, in `hardware/`.
+
+| Scene | Scent | Sound |
+|-------|-------|-------|
+| Beach | Ocean breeze | Waves, seagulls |
+| Forest | Pine, earth | Birds, rustling leaves |
+| Garden | Floral | Bees, gentle wind |
+| Mountain | Fresh alpine | Wind, distant streams |
+
+## Repository layout
 
 ```
 Code/
-├── azure-pipeline/           # Azure Functions & backend services
-│   ├── dotnet-functions/     # .NET Azure Functions
-│   │   ├── Functions/        # API endpoints
-│   │   │   ├── AudioToImageWithSound.cs  # Main pipeline
-│   │   │   ├── GetRandomImage.cs         # Pre-made scenes
-│   │   │   └── GetRandomSound.cs         # Ambient sounds
-│   │   └── Services/         # ComfyUI integration
-│   └── *.py                  # Test scripts
-│
-└── esp32/
-    └── esp-diffuser/         # ESP32 firmware
-        ├── main/             # Device firmware (C)
-        └── espendpoint/      # Azure Function for IoT control
+├── azure-pipeline/
+│   ├── dotnet-functions/   .NET 8 Azure Functions (speech, prompt, image, sound)
+│   └── *.py, *.sh          test and helper scripts
+└── esp32/esp-diffuser/
+    ├── main/               ESP32 firmware (C, ESP-IDF)
+    └── espendpoint/        Python Azure Function that controls the diffusers
+hardware/                   STL files for the diffuser housing and bottle bracket
+Documentation/              project documentation and presentation
 ```
 
-## 🚀 Getting Started
+## Setup
 
-### Prerequisites
+You need an Azure subscription (Functions, IoT Hub, Blob Storage, Speech, OpenAI), a ComfyUI server with the models above, ESP-IDF 5, the .NET 8 SDK and Python 3.10+.
 
-- [Azure Account](https://azure.microsoft.com/) with:
-  - Azure Functions
-  - Azure IoT Hub
-  - Azure Blob Storage
-  - Azure Speech Services
-  - Azure OpenAI
-- [ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/latest/) for ESP32 development
-- [.NET 8 SDK](https://dotnet.microsoft.com/)
-- Python 3.10+
-
-### Configuration
-
-1. **Azure Functions** - Copy example configs and add your credentials:
-   ```bash
-   cd azure-pipeline/dotnet-functions
-   cp local.settings.example.json local.settings.json
-   # Edit local.settings.json with your Azure keys
-   ```
-
-2. **ESP32 Devices** - Copy config template:
-   ```bash
-   cd esp32/esp-diffuser/main
-   cp config.example.h config.h
-   # Edit config.h with WiFi and Azure IoT credentials
-   ```
-
-3. **Environment Variables** (for test scripts):
-   ```bash
-   cd azure-pipeline
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
-
-### Running Locally
-
-**Azure Functions:**
+**Backend (.NET Functions)**
 ```bash
-cd azure-pipeline/dotnet-functions
+cd Code/azure-pipeline/dotnet-functions
+cp local.settings.example.json local.settings.json   # fill in your Azure and ComfyUI values
 func start
 ```
 
-**ESP32 Firmware:**
+**Diffuser endpoint (Python Function)**
 ```bash
-cd esp32/esp-diffuser
-idf.py build
-idf.py flash
+cd Code/esp32/esp-diffuser/espendpoint
+cp local.settings.example.json local.settings.json   # set IOT_HUB_CONNECTION_STRING
+pip install -r requirements.txt
+func start
 ```
 
-## 🔌 API Endpoints
-
-### Generate Panorama from Voice
-```
-POST /api/audio-to-image-with-sound
-Content-Type: audio/wav
-Body: <audio file>
-
-Response: { "imageUrl": "...", "soundUrl": "...", "category": "beach" }
+**ESP32 firmware**
+```bash
+cd Code/esp32/esp-diffuser
+cp main/config.example.h main/config.h   # Wi-Fi, IoT Hub host, device ID and key
+idf.py build flash monitor
 ```
 
-### Get Random Pre-made Scene
-```
-GET /api/images/{category}
-# category: beach, forest, garden, mountain
+The helper scripts in `Code/azure-pipeline` read the function key from the `AZURE_FUNCTION_KEY` environment variable. No credentials are stored in the repository.
 
-Response: { "imageUrl": "...", "category": "beach" }
-```
+## API
 
-### Get Random Ambient Sound
-```
-GET /api/sounds/{category}
+| Method | Route | Purpose |
+|--------|-------|---------|
+| POST | `/api/audio-to-image-with-sound` | WAV audio in, panorama URL, sound URL and category out |
+| POST | `/api/audio-to-prompt` | WAV audio in, image prompt out |
+| POST | `/api/generate-image` | prompt in, panorama URL out |
+| GET | `/api/images/{category}` | random pre-made panorama |
+| GET | `/api/sounds/{category}` | random ambient sound |
+| GET | `/api/{device}/{minutes}` | diffuser endpoint: turn a diffuser on |
+| GET | `/api/{device}/stop` · `/api/stop-all` | diffuser endpoint: turn one or all off |
 
-Response: { "soundUrl": "...", "category": "forest" }
-```
+## Team
 
-### Control ESP32 Diffuser
-```
-GET /api/{device}/{duration}
-# device: esp0-beach, esp1-forest, esp2-garden, esp3-mountain
-# duration: minutes (integer) or "stop"
+Team Ergo G1, Howest University of Applied Sciences.
 
-GET /api/stop-all  # Stop all diffusers
-```
+Mihai Alexandru Matei was product owner and built the backend, the ESP32 diffusers (electronics, firmware and enclosures) and the documentation. The Unity front end and design were built by the other team members.
 
-## 🎯 Scene Categories
+## Tech stack
 
-| Category | Scent | Sound | Visual |
-|----------|-------|-------|--------|
-| 🏖️ Beach | Ocean breeze | Waves, seagulls | Coastal panorama |
-| 🌲 Forest | Pine, earth | Birds, rustling leaves | Woodland panorama |
-| 🌸 Garden | Floral | Bees, gentle wind | Garden panorama |
-| ⛰️ Mountain | Fresh alpine | Wind, distant streams | Mountain panorama |
-
-## 🛠️ Tech Stack
-
-- **Backend**: Azure Functions (.NET 8), Python
-- **AI Services**: Azure OpenAI (GPT-4o), Azure Speech Services
-- **Image Generation**: ComfyUI with Flux model
-- **IoT**: Azure IoT Hub, MQTT
-- **Hardware**: ESP32, relay modules, scent diffusers
-- **Storage**: Azure Blob Storage
-
-## 📄 License
-
-This project was developed as part of a university team project.
-
-## 👥 Team
-
-Experiential Learning Team - Howest University
+.NET 8 · Azure Functions · Azure OpenAI (GPT-4o-mini) · Azure Speech · Azure IoT Hub · Azure Blob Storage · ComfyUI · SDXL · Python · C / ESP-IDF · MQTT · Unity 6

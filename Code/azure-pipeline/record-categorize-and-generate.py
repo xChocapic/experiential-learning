@@ -50,9 +50,9 @@ except ImportError:
     print("  pip3 install azure-storage-blob")
     sys.exit(1)
 
-# Configuration - HARDCODED FOR PORTABILITY (works on any PC without env vars)
+# Configuration - set AZURE_FUNCTION_KEY in your environment
 API_BASE = "https://endpoint-gtfbdtb7bwf2hsfb.westeurope-01.azurewebsites.net/api"
-FUNCTION_KEY = "3LKq6SmNriNUNQ6tXeSsE3JqGRKOj58YypNp5RDWhZ7-AzFu3Cr5Fg=="
+FUNCTION_KEY = os.getenv("AZURE_FUNCTION_KEY", "")
 
 def get_api_url(endpoint):
     """Build full API URL with function code"""

@@ -57,7 +57,7 @@ except ImportError:
 API_BASE = "https://endpoint-gtfbdtb7bwf2hsfb.westeurope-01.azurewebsites.net/api"
 
 # Host-level function key (works for ALL functions)
-FUNCTION_KEY = "daWi0Itt20SAgEJ5H6j63j9RNPtMXxxJ-Q3e8ZgddrkVAzFuI7bfxg=="
+FUNCTION_KEY = os.getenv("AZURE_FUNCTION_KEY", "")
 
 # Audio settings
 SAMPLE_RATE = 16000  # Azure Speech Service works best with 16kHz
