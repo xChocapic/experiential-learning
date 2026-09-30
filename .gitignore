@@ -458,3 +458,6 @@ Code/azure-pipeline/test-simple.py
 *.jpeg
 *.gif
 *.bmp
+
+__pycache__/
+.DS_Store

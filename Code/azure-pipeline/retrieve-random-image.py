@@ -30,9 +30,9 @@ try:
 except ImportError:
     pass
 
-# Configuration - HARDCODED FOR PORTABILITY (works on any PC without env vars)
+# Configuration - set AZURE_FUNCTION_KEY in your environment
 API_BASE = "https://endpoint-gtfbdtb7bwf2hsfb.westeurope-01.azurewebsites.net/api"
-FUNCTION_KEY = "3LKq6SmNriNUNQ6tXeSsE3JqGRKOj58YypNp5RDWhZ7-AzFu3Cr5Fg=="
+FUNCTION_KEY = os.getenv("AZURE_FUNCTION_KEY", "")
 VALID_CATEGORIES = ["beach", "mountain", "forest", "garden"]
 OUTPUT_DIR = Path(__file__).parent / "retrieved_images"
 

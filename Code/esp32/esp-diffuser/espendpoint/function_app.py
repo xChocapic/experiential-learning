@@ -15,9 +15,16 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 app.enable_cors = True
 
 # IoT Hub configuration
-IOT_HUB_NAME = "espcontrol"
-SHARED_ACCESS_KEY = "Ztu3+zjBFGPHiRuXFFBEMO+YXxujYGBJKAIoTP0xHNs="
-POLICY_NAME = "service"
+# Read from the IOT_HUB_CONNECTION_STRING app setting, e.g.
+# HostName=<hub>.azure-devices.net;SharedAccessKeyName=service;SharedAccessKey=<key>
+_conn = dict(
+    part.split("=", 1)
+    for part in os.environ.get("IOT_HUB_CONNECTION_STRING", "").split(";")
+    if "=" in part
+)
+IOT_HUB_NAME = _conn.get("HostName", "").split(".")[0]
+SHARED_ACCESS_KEY = _conn.get("SharedAccessKey", "")
+POLICY_NAME = _conn.get("SharedAccessKeyName", "service")
 
 # Device mapping
 DEVICE_MAPPING = {
