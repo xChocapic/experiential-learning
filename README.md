@@ -4,6 +4,10 @@ A voice-driven multisensory room. A visitor describes a place out loud, and with
 
 Built as a Howest CTAI team project (team Ergo G1, 2025–2026) for the occupational-therapy track.
 
+![A generated 360° panorama, shown flat: waterfall in a forest](docs/panorama.jpg)
+
+Demo video and more photos: [xchocapic.github.io/projects/immersive-room.html](https://xchocapic.github.io/projects/immersive-room.html)
+
 ## How it works
 
 1. **Voice to prompt.** A recording is sent to an Azure Function. Azure Speech transcribes it and GPT-4o-mini turns it into an image prompt and a scene category (beach, forest, garden or mountain).
@@ -20,6 +24,10 @@ Voice ──▶ .NET Azure Functions ──▶ ComfyUI (SDXL) ──▶ 8K panor
 ```
 
 ## Scent diffusers
+
+![How the scent diffusers work, from the room app to the fans](docs/scent-diffusers.png)
+
+![One of the diffusers: yellow 3D-printed housing with a fan on top](docs/diffuser.jpg)
 
 Four identical units, one per scene: `esp0-beach`, `esp1-forest`, `esp2-garden`, `esp3-mountain`.
 
@@ -50,6 +58,7 @@ Code/
     └── espendpoint/        Python Azure Function that controls the diffusers
 hardware/                   STL files for the diffuser housing and bottle bracket
 Documentation/              project documentation and presentation
+docs/                       images used in this README
 ```
 
 ## Setup
